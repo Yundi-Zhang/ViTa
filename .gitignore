@@ -1,0 +1,16 @@
+__pycache__/
+*.idea
+wandb
+experiments
+datasets/data_files/
+*.json
+.vscode/
+configs/check_points.yaml
+*.pkl
+*.pt
+*.npy
+*.npz
+*.csv
+.lrz_env
+results/
+shell_scripts_unicorn/

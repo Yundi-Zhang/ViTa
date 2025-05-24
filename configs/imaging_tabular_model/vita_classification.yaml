@@ -1,0 +1,121 @@
+general:
+  seed: 1 # 1 for 0.7 mask ratio, 32 for 0.9
+  wandb_disabled: "false"
+  resume_training: True
+  # wandb_run_id: 
+  # resume_ckpt_path: 
+
+
+trainer:
+  max_epochs: 2000
+  check_val_every_n_epoch: 2
+
+
+data:
+  general_data:
+    train_num_per_epoch: 10000 # Must to be the integer multiple of batch size for multigpus
+    idx_start: 0
+    num_train: 38308
+    num_val: 1000
+    num_test: 100
+    num_workers: 32
+    batch_size: 4 # 512
+    dataset_cls: ImagingAllAXTabular_TabRcon
+
+  imaging_data:
+    ignore_phenotype_tabular: True
+    cmr_path_pickle_name: REPLACE_WITH_YOUR_CMR_PATH_PICKLE_NAME
+    subj_ids_with_required_size_pickle_name: REPLACE_WITH_YOUR_SUBJ_PICKLE_NAME
+    replace_processed: False
+    data_filtering: False
+    sax_slice_num: 6 # 6 for 3D, 1 for 2D
+    image_size: [128, 128]
+    frame_to_keep: 5
+    augment: True
+
+  tabular_data:
+    tabular_data: REPLACE_WITH_YOUR_TABULAR_DATA
+    raw_tabular_data: REPLACE_WITH_YOUR_LABELS
+    corruption_rate: 0.3
+    one_hot_tabular: False
+    tab_augment: False
+  
+  validation_data:
+    validation_form: "classification"
+    # selected_cols: ["Age when attended assessment centre-2.0"]
+    labels: REPLACE_WITH_YOUR_LABELS_PATH
+
+
+
+module:
+  task_idx: 1 # 0: pretraining, 1: reconstruction
+  module_idx: 0 # 0: SimCLRTabRecon, 1: SimCLRImgRecon
+  
+
+  imaging_hparams:
+    load_imaging_encoder: True
+    freeze_imaging_encoder: False
+    imaging_ckpt_path: REPLACE_WITH_YOUR_IMAGING_CKPT_PATH
+    patch_embed_cls: "PatchEmbed" # PatchEmbed_Spatial, PatchEmbed
+    patch_size: [5, 8, 8]
+    pixel_unshuffle_scale: 1
+    circular_pe: False
+    use_enc_pe: True
+    mask_loss: True
+    shift_size: [0, 0 ,0]
+    mask_type: "random"
+    mask_ratio: 0.0
+    
+    enc_embed_dim: 1025
+    enc_depth: 6
+    enc_num_heads: 5
+    projection_dim: 128
+    grad_checkpointing: True
+  
+  tabular_hparams:
+    load_tabular_encoder: False
+    freeze_tabular_encoder: False
+
+    corruption_rate: 0.3
+    one_hot: True
+    eval_one_hot: True
+
+    input_size: 265 # paul: 265, jz: 79
+    embedding_dim: 2048
+    encoder_num_layers: 2
+    projector_num_layers: 1
+    init_strat: kaiming
+    projection_dim: 128 # = imaging_hparams.projection_dim
+    grad_checkpointing: True
+
+    # Decoder
+    decoder_dim: 256
+    decoder_depth: 2
+    # decoder_out_dim: 1
+    decoder_type: "linear" # "linear", "linear_cls", "pool", "pool_cls"
+    decoder_head_type: "classification" # "classification", "numerical", "single_categorical", "multi_categorical"
+    selected_features: ["Diagnosed_Stroke"]
+  
+
+  training_hparams:
+    # Logging
+    train_log_rate: 2
+    val_log_rate: 2
+    # classifier_freq: 1
+    log_images: True
+
+    # Criterions
+    num_classes: 2
+    temperature: 0.1
+    lambda_0: 0.5
+
+    # Optimization
+    lr: 0.000001
+    weight_decay: 0
+    scheduler: "anneal"
+    warmup_epochs: 5
+    anneal_max_epochs: 200
+    loss_types: ["huber"]
+    
+
+

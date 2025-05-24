@@ -1,0 +1,54 @@
+general:
+  seed: 1
+  wandb_disabled: "false"
+  freeze_encoder: False
+  resume_training: False
+  load_encoder: False
+  # wandb_run_id: 
+  # resume_ckpt_path: 
+
+data:
+  ignore_phenotype_tabular: False
+  cmr_path_pickle_name: REPLACE_WITH_YOUR_CMR_PATH_PICKLE_NAME
+  subj_ids_with_required_size_pickle_name: REPLACE_WITH_YOUR_SUBJ_PICKLE_NAME
+  target_tabular_data: REPLACE_WITH_YOUR_TABULAR_DATA
+  replace_processed: False
+  data_filtering: False
+  sax_slice_num: 6 # 6 for 3D, 1 for 2D
+  image_size: [128, 128]
+  frame_to_keep: 5
+  train_num_per_epoch: 1000
+  num_train: 42000
+  num_val: 1500
+  num_test: 1000
+  num_workers: 4
+  batch_size: 4
+  dataset_cls: Cardiac3DplusTAllAX
+  target_value_name: &feature_names ["RASV (mL)"] 
+
+
+module:
+  task_idx: 1 # reconstrucion: 0, regression: 1, segmentation: 2
+  module_idx: 0 # RegrMAE: 0, ResNet18: 1, ResNet50: 2
+  
+  regr_hparams:
+    enc_embed_dim: 1025
+    enc_depth: 6
+    enc_num_heads: 5
+    dec_embed_dim: 256
+    dec_depth: 2
+    regressor_type: "linear" # "linear", "cls_token"
+    selected_features: *feature_names
+
+  training_hparams:
+    lr: 0.00001
+    patch_size: [5, 8, 8]
+    loss_types: ["huber"] # [mse]
+    loss_weights: [1.0]
+    train_log_rate: 2
+    val_log_rate: 2
+
+
+trainer:
+  max_epochs: 600
+  check_val_every_n_epoch: 5
