@@ -85,6 +85,8 @@ class ReconstructionCriterion(torch.nn.Module):
             self.loss_fcts = [loss_fct_dict[self.loss_types]]
         else:
             self.loss_fcts += [loss_fct_dict[loss_name] for loss_name in self.loss_types]
+
+        self.use_mask_in_loss = kwargs.get("mask_loss", False)
         
     def forward(self, x, y, mask: Optional[torch.Tensor] = None, **kwargs):
         """Compute reconstruction loss
@@ -96,7 +98,7 @@ class ReconstructionCriterion(torch.nn.Module):
         psnr_value: float, psnr value
         """
         assert x.shape[-1] == y.shape[-1]
-        if mask is not None:
+        if self.use_mask_in_loss:
             masked_x = x[mask == 1]
             masked_y = y[mask == 1]
         else:

@@ -230,24 +230,29 @@ class UNETR_decoder(nn.Module):
 class ImagingMaskedDecoder(nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__()
-        self.dec_embed_dim = kwargs.get("dec_embed_dim")
         self.grid_size = kwargs.get("grid_size")
+        self.dec_embed_dim = kwargs.get("dec_embed_dim")
         self.use_both_axes = kwargs.get("use_both_axes")
-        self.circular_pe = kwargs.get("circular_pe")
+        self.decoder_num_patches = kwargs.get("num_patches")
+
         self.decoder_embed = nn.Linear(kwargs.get("enc_embed_dim"), kwargs.get("dec_embed_dim"))
         self.dec_pos_embed = nn.Parameter(
-            torch.zeros(1, 1 + kwargs.get("num_patches"), kwargs.get("dec_embed_dim")), requires_grad=False)
+            torch.zeros(1, 1 + self.decoder_num_patches, kwargs.get("dec_embed_dim")), requires_grad=False)
         self.decoder = ViTDecoder(dim=kwargs.get("dec_embed_dim"), 
                                   num_heads=kwargs.get("dec_num_heads"),
                                   depth=kwargs.get("dec_depth"),
-                                  mlp_ratio=kwargs.get("mlp_ratio"),
-                                  grad_checkpointing=kwargs.get("grad_checkpointing"),)
+                                  mlp_ratio=kwargs.get("mlp_ratio"),)
+        self.recon_head = nn.Linear(in_features=kwargs.get("dec_embed_dim"),
+                                    out_features=kwargs.get("head_out_dim"),)
+        self.mask_token = nn.Parameter(torch.zeros(1, 1, self.dec_embed_dim), requires_grad=True)
+        self.initialize_parameters()
     
-    def initialize_parameters(self):        
-        # Initialize (and freeze) pos_embed by sin-cos embedding
+    def initialize_parameters(self):
         dec_pos_embed = sincos_pos_embed(self.dec_embed_dim, self.grid_size, cls_token=True,
-                                         use_both_axes=self.use_both_axes, circular_pe=self.circular_pe)
+                                         use_both_axes=self.use_both_axes)
         self.dec_pos_embed.data.copy_(dec_pos_embed.unsqueeze(0))
+        if hasattr(self, "mask_token"):
+            torch.nn.init.normal_(self.mask_token, std=.02)
 
         # Initialize nn.Linear and nn.LayerNorm
         self.apply(self._init_weights) # TODO
@@ -261,8 +266,8 @@ class ImagingMaskedDecoder(nn.Module):
         elif isinstance(m, nn.LayerNorm):
             nn.init.constant_(m.bias, 0)
             nn.init.constant_(m.weight, 1.0)
-            
-    def forward(self, x, mask_token, ids_restore):
+
+    def forward(self, x, ids_restore):
         """Forward pass of reconstruction decoder
         input:
             x: [B, 1 + length * mask_ratio, embed_dim] torch.Tensor
@@ -274,20 +279,20 @@ class ImagingMaskedDecoder(nn.Module):
         x = self.decoder_embed(x)
         
         # Append mask tokens and add positional embedding in schuffled order
-        if ids_restore is not None:
-            mask_token_n = ids_restore.shape[1] + 1 - x.shape[1]
-            mask_tokens = mask_token.repeat(x.shape[0], mask_token_n, 1)
-            x_shuffle = torch.cat([x[:, 1:, :], mask_tokens], dim=1)
-            x_restore = torch.gather(x_shuffle, dim=1, index=ids_restore.unsqueeze(-1).repeat(1, 1, x_shuffle.shape[-1]))
-            dec_pos_embed = self.dec_pos_embed.repeat(x.shape[0], 1, 1)
-            x_restore_ = x_restore + dec_pos_embed[:, 1:, :]
-            cls_tok_ = x[:, :1, :] + dec_pos_embed[:, :1, :]
-            
-            # Reconstruction decoder
-            x = torch.cat([cls_tok_, x_restore_], dim=1) # add class token
-        else:
-            dec_pos_embed = self.dec_pos_embed.repeat(x.shape[0], 1, 1)
-            x = x + dec_pos_embed
+        mask_token_n = ids_restore.shape[1] + 1 - x.shape[1]
+        mask_tokens = self.mask_token.repeat(x.shape[0], mask_token_n, 1)
+        x_shuffle = torch.cat([x[:, 1:, :], mask_tokens], dim=1)
+        x_restore = torch.gather(x_shuffle, dim=1, index=ids_restore.unsqueeze(-1).repeat(1, 1, x_shuffle.shape[-1]))
+        dec_pos_embed = self.dec_pos_embed.repeat(x.shape[0], 1, 1)
+        x_restore_ = x_restore + dec_pos_embed[:, 1:, :]
+        cls_tok_ = x[:, :1, :] + dec_pos_embed[:, :1, :]
+        
+        # Reconstruction decoder
+        x = torch.cat([cls_tok_, x_restore_], dim=1) # add class token
         x = self.decoder(x) # apply transformer decoder
-
+        
+        # Reconstruction head
+        x = self.recon_head(x)
+        x = x[:, 1:, :] # remove cls token
+        x = torch.sigmoid(x) # scale x to [0, 1] for reconstruction task
         return x

@@ -19,7 +19,6 @@ class ImagingMaskedEncoder(nn.Module):
         self.shift_size = kwargs.get("shift_size")
         self.patch_embed_cls = globals()[kwargs.get("patch_embed_cls")]
         self.img_shape = kwargs.get("img_shape")
-        self.S_sax = kwargs.get("S_sax")
         self.patch_in_channels = kwargs.get("patch_in_channels")
         self.use_both_axes = kwargs.get("use_both_axes")
         self.patch_p_num = np.prod(kwargs.get("patch_size")) * self.patch_in_channels
@@ -29,9 +28,7 @@ class ImagingMaskedEncoder(nn.Module):
         self.pixel_unshuffle_scale = kwargs.get("pixel_unshuffle_scale")
         self.patch_embed = self.patch_embed_cls(self.img_shape, 
                                                 in_channels=self.patch_in_channels, 
-                                                sax_slice_num=self.S_sax, 
                                                 patch_size=kwargs.get("patch_size"), 
-                                                pixel_unshuffle_scale=self.pixel_unshuffle_scale, 
                                                 out_channels=kwargs.get("enc_embed_dim"), )
         self.cls_token = nn.Parameter(torch.zeros(1, 1, self.patch_embed.out_channels))
         self.enc_pos_embed = nn.Parameter(torch.zeros(1, 1 + self.patch_embed.num_patches, self.patch_embed.out_channels), 
