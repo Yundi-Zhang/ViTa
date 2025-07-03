@@ -6,12 +6,12 @@ This repository contains the code used in the research paper: [Towards Cardiac M
 
 ![Diagram](main.png)
 <p align="center">
-  <img src="tsne_visualization.gif" alt="GIF 1" width="47%">
+  <img src="tsne_visualization.gif" alt="GIF 1" width="50%">
   <img src="tsne_tempo.gif" alt="GIF 2" width="42%">
 </p>
 
 <div style="text-align: center;">
-  <img src="tsne_temporal_continuity.png" width="80%">
+  <img src="tsne_temporal_continuity.png" width="100%">
 </div>
 
 
