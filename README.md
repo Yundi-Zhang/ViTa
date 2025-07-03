@@ -10,6 +10,11 @@ This repository contains the code used in the research paper: [Towards Cardiac M
   <img src="tsne_tempo.gif" alt="GIF 2" width="42%">
 </p>
 
+<div style="text-align: center;">
+  <img src="tsne_temporal_continuity.png" width="80%">
+</div>
+
+
 ## Description
 In this project, we introduce a multimodel framework ***ViTa*** for a comprehensive, patient-specific understanding of cardiac health. By integrating rich **3D+T cine CMR data** (from both short-axis and long-axis views) with **detailed tabular health records** from **42,000 UK Biobank participants**, ViTa enabels context-aware representation learning that supports a wide range of cardiac and metabolic health tasks in a **singed unified framework**. 
 
