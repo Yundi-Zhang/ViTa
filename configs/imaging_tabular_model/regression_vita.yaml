@@ -1,0 +1,118 @@
+general:
+  seed: 1 # 1 for 0.7 mask ratio, 32 for 0.9
+  wandb_entity:  # your wandb entity
+  wandb_disabled: "false"
+  wandb_run_id: 
+  resume_training: False
+  resume_ckpt_path: 
+
+
+trainer:
+  max_epochs: 2000
+  check_val_every_n_epoch: 2
+  devices: 1
+
+
+data:
+  general_data:
+    train_num_per_epoch: 10000 # Must to be the integer multiple of batch size for multigpus
+    idx_start: 0
+    num_train: 42000
+    num_val: 1500
+    num_test: 1000
+    num_workers: 32
+    batch_size: 8
+    dataset_cls: ImagingAllAXTabular_TabRcon
+
+  imaging_data:
+    ignore_phenotype_tabular: True
+    cmr_path_pickle_name: "recon_cmr_subject_paths_50k_new.pkl" # The pickle file name containing all CMR image paths
+    subj_ids_with_required_size_pickle_name: "subj_ids_with_required_size.pkl" # The pickle file name containing IDs of all subjects with required size
+    replace_processed: False
+    data_filtering: False
+    sax_slice_num: 6 # 6 for 3D, 1 for 2D
+    image_size: [128, 128]
+    frame_to_keep: 5
+    augment: True
+
+  tabular_data:
+    tabular_data: "preprocessed_tab_paul.csv" # the csv file of processed tabular data
+    raw_tabular_data: "raw_tab_paul_new.csv" # the csv file of raw target tabular data
+    corruption_rate: 0.3
+    one_hot_tabular: False
+    tab_augment: False
+  
+  validation_data:
+    validation_form: "classification"
+    # selected_cols: ["Age when attended assessment centre-2.0"]
+    labels: "labels_CAD.csv" # the csv file of the disease labels for the validation contrastive learning
+
+
+module:
+  task_idx: 1 # 0: pretraining, 1: reconstruction
+  module_idx: 0 # 0: SimCLRTabRecon
+  
+
+  imaging_hparams:
+    load_imaging_encoder: True
+    freeze_imaging_encoder: False
+    imaging_ckpt_path: "" # the ckpt of pretrained imaging-tabular model
+    patch_embed_cls: "PatchEmbed" # PatchEmbed_Spatial, PatchEmbed
+    patch_size: [5, 8, 8]
+    pixel_unshuffle_scale: 1
+    circular_pe: False
+    use_enc_pe: True
+    mask_loss: True
+    shift_size: [0, 0 ,0]
+    mask_type: "random"
+    mask_ratio: 0.0
+    
+    enc_embed_dim: 1025
+    enc_depth: 6
+    enc_num_heads: 5
+    projection_dim: 128
+    grad_checkpointing: True
+  
+  tabular_hparams:
+    load_tabular_encoder: False
+    freeze_tabular_encoder: False
+
+    corruption_rate: 0.3
+    one_hot: True
+    eval_one_hot: True
+
+    input_size: 265 # paul: 265, jz: 79
+    embedding_dim: 2048
+    encoder_num_layers: 2
+    projector_num_layers: 1
+    init_strat: kaiming
+    projection_dim: 128 # = imaging_hparams.projection_dim
+    grad_checkpointing: True
+
+    # Decoder
+    decoder_dim: 256
+    decoder_depth: 2
+    decoder_type: "linear" # "linear", "linear_cls", "pool", "pool_cls"
+    decoder_head_type: "numerical" # "numerical", "single_categorical", "multi_categorical"
+    use_scalor: False
+    selected_features: ["LVEDV (mL)", "LVESV (mL)", "LVSV (mL)", "LVEF (%)", "LVCO (L/min)", "LVM (g)", "RVEDV (mL)", "RVESV (mL)", "RVSV (mL)", "RVEF (%)", "LAV max (mL)", "LAV min (mL)", "LASV (mL)", "LAEF (%)", "RAV max (mL)", "RAV min (mL)", "RASV (mL)", "RAEF (%)"] # the name of selected target features
+
+  training_hparams:
+    # Logging
+    train_log_rate: 2
+    val_log_rate: 2
+    log_images: True
+
+    # Criterions
+    num_classes: 2
+    temperature: 0.1
+    lambda_0: 0.5
+
+    # Optimization
+    lr: 0.000001
+    weight_decay: 0
+    scheduler: "anneal"
+    warmup_epochs: 5
+    anneal_max_epochs: 200
+    loss_types: ["huber"]
+    loss_weights: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,]

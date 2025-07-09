@@ -1,0 +1,14 @@
+__pycache__/
+.vscode/
+*.idea
+wandb/
+*.pkl
+*.pt
+*.npy
+*.npz
+*.csv
+datasets/data_files/
+results/
+checkpoints/
+logs/
+shell_scripts_lrz/
