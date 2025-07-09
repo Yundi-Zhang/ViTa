@@ -69,10 +69,8 @@ Before you begin, ensure you have met the following requirements:
     ```
 
 4. **Configure environment variables**
-    Rename `.env.name` to `.env` and update the necessary environment variables.
-    ```bash
-    mv .env.name .env
-    ```
+    Update the necessary environment variables in `.env`.
+
 
 ## Data File Structure
 This project uses NIfTI files to store imaging data. For each subject, the data is organized in a specific folder structure with various NIfTI files for different types of images and their corresponding segmentations.
