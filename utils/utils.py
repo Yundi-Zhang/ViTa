@@ -7,6 +7,7 @@ from torch import nn
 import torch
 from torchvision import transforms
 
+
 def create_logdir(name: str, resume_training: bool, wandb_logger):
   basepath = join(os.path.dirname(os.path.abspath(sys.argv[0])),'runs', name)
   run_name = wandb_logger.experiment.name
@@ -15,6 +16,7 @@ def create_logdir(name: str, resume_training: bool, wandb_logger):
     raise Exception(f'Run {run_name} already exists. Please delete the folder {logdir} or choose a different run name.')
   os.makedirs(logdir,exist_ok=True)
   return logdir
+
 
 def grab_image_augmentations(img_size: int, target: str, crop_scale_lower: float = 0.08) -> transforms.Compose:
   """
@@ -40,6 +42,7 @@ def grab_image_augmentations(img_size: int, target: str, crop_scale_lower: float
     ])
   return transform
 
+
 def grab_soft_eval_image_augmentations(img_size: int) -> transforms.Compose:
   """
   Defines augmentations to be used during evaluation of contrastive encoders. Typically a less sever form of contrastive augmentations.
@@ -52,6 +55,7 @@ def grab_soft_eval_image_augmentations(img_size: int) -> transforms.Compose:
     transforms.Lambda(lambda x: x.float())
   ])
   return transform
+
 
 def grab_hard_eval_image_augmentations(img_size: int, target: str) -> transforms.Compose:
   """
@@ -77,6 +81,7 @@ def grab_hard_eval_image_augmentations(img_size: int, target: str) -> transforms
     ])
   return transform
 
+
 def grab_wids(category: str):
   # boat
   wids_b = ['n02951358', 'n03447447', 'n04612504', 'n03344393', 'n03662601', 'n04273569'] 
@@ -94,6 +99,7 @@ def grab_wids(category: str):
   else:
     raise ValueError('Category not recognized')
 
+
 def grab_arg_from_checkpoint(args: str, arg_name: str):
   """
   Loads a lightning checkpoint and returns an argument saved in that checkpoints hyperparameters
@@ -105,12 +111,14 @@ def grab_arg_from_checkpoint(args: str, arg_name: str):
     load_args = args
   return load_args[arg_name]
 
+
 def chkpt_contains_arg(ckpt_path: str, arg_name: str):
   """
   Checks if a checkpoint contains a given argument.
   """
   ckpt = torch.load(ckpt_path)
   return arg_name in ckpt['hyper_parameters']
+
 
 def prepend_paths(hparams):
   db = hparams.data_base
@@ -134,6 +142,7 @@ def prepend_paths(hparams):
 
   return hparams
 
+
 def re_prepend_paths(hparams):
   db = hparams.data_base
   
@@ -154,6 +163,7 @@ def re_prepend_paths(hparams):
       hparams[hp] = join(db, hparams['{}_short'.format(hp)])
 
   return hparams
+
 
 def cos_sim_collate(data: List[Tuple[torch.Tensor, torch.Tensor, torch.Tensor]]):
   """
@@ -177,6 +187,7 @@ def cos_sim_collate(data: List[Tuple[torch.Tensor, torch.Tensor, torch.Tensor]])
     cos_sim_matrix = torch.threshold(cos_sim_matrix,threshold,0)
 
   return view_1, view_2, labels, cos_sim_matrix
+
 
 def calc_logits_labels(out0, out1, temperature=0.1):
   out0 = nn.functional.normalize(out0, dim=1)

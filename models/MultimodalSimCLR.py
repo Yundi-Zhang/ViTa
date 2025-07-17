@@ -3,8 +3,6 @@ import random
 import time
 from typing import List, Tuple, Dict
 
-from matplotlib import pyplot as plt
-import numpy as np
 from sklearn.discriminant_analysis import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.manifold import TSNE
@@ -12,7 +10,6 @@ import torch
 import lightning.pytorch as pl
 import torchmetrics
 from termcolor import colored
-from tqdm import tqdm
 import wandb
 
 from networks.imaging_encoders import ImagingMaskedEncoder
@@ -22,12 +19,11 @@ from transformers import get_cosine_schedule_with_warmup
 
 from networks.tabular_encoders import *
 from utils.logging_related import imgs_to_wandb_video
-from utils.vis_related import plot_one_label
+from utils.utils_visualization import plot_one_label
 
 
 with open('datasets/data_files/tabular_files/feature_names_input.json', 'r') as f:
     FEATURE_NAMES_IN = json.load(f)
-
     
 
 class MultimodalSimCLR(pl.LightningModule):
