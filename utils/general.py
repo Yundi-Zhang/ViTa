@@ -63,17 +63,6 @@ def get_data_paths():
                       dataloader_image_file_folder=os.path.join(os.environ["DATALOADER_IMAGE_FILE_ROOT"]),
                       dataloader_tabular_file_folder=os.path.join(os.environ["DATALOADER_TABULAR_FILE_ROOT"]),
                       )
-    
-    
-def get_computer_id():
-    hostname = socket.gethostname()
-    if hostname == "unicorn":
-        return "yundi-wks"
-    elif hostname in ['atlas', 'chameleon', 'helios', 'prometheus', 'leto', 'hercules', 'apollo']:  # GPU server
-        logname = os.environ["LOGNAME"]
-        return f"{logname}-gpu"
-    else:
-        raise Exception(f"Unknown hostname: {hostname}.")
 
 
 def normalize_image(im: Union[np.ndarray, torch.Tensor], low: float = None, high: float = None, clip=True, 
