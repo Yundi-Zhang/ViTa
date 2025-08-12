@@ -1,8 +1,4 @@
-from dataclasses import asdict
-import json
 import os
-from pathlib import Path
-import sys
 import torch
 import wandb
 import gc
@@ -12,7 +8,7 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 from utils.general import get_data_paths, parser_command_line
 from initializers.initialize_dataloader import initialize_dataloader
 from initializers.initialize_model import initialize_model
-from initializers.initialize_parameters import initialize_parameters, initialize_ckpt_args, initialize_wandb_logger
+from initializers.initialize_parameters import initialize_parameters, setup_ckpt_path, initialize_ckpt_args, initialize_wandb_logger
 
 
 def run():
@@ -35,18 +31,7 @@ def run():
     model = initialize_model(args, params, paths, data_module)
     
     # Check the resuming and loading of the checkpoints
-    if params.general.resume_training:  # Resume training
-        assert params.general.resume_ckpt_path != None, "The path for checkpoint is not provided."
-        resume_ckpt_path = Path(paths.log_folder) / params.general.resume_ckpt_path
-        ckpt_dir = resume_ckpt_path.parent
-        if wandb_run_name != ckpt_dir.parent.name and wandb_run_name is not None:
-            ckpt_dir = resume_ckpt_path.parent.parent.parent / wandb_run_name / time_now
-        print(f"ckpt_dir: {ckpt_dir}")
-        checkpoint = torch.load(resume_ckpt_path, weights_only=False, map_location="cpu")
-        model.load_state_dict(checkpoint["state_dict"], strict=True)
-    else:
-        # resume_ckpt_path = None
-        ckpt_dir = os.path.join(f"{paths.log_folder}/checkpoints_{args.module}/{wandb_run_name}/{time_now}")
+    ckpt_dir, resume_ckpt_path = setup_ckpt_path(args, paths, params, wandb_run_name, time_now)
     
     # Monitor foreground dice for segmentation. When reconstruction, monitor PSNR. MAE for regression.
     monitor_metric, ckpt_filename, monitor_mode = initialize_ckpt_args(args, params)
@@ -74,7 +59,7 @@ def run():
 
     if args.pipeline == "train":
         model.save_embeddings = False
-        trainer.fit(model, datamodule=data_module)
+        trainer.fit(model, datamodule=data_module, ckpt_path=resume_ckpt_path)
     elif args.pipeline == "val":
         trainer.validate(model, datamodule=data_module)
     elif args.pipeline == "test":

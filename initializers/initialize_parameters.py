@@ -1,4 +1,5 @@
 from dataclasses import asdict, fields
+from pathlib import Path
 import yaml
 from typing import Any, Dict
 from datetime import datetime
@@ -43,6 +44,21 @@ def initialize_wandb_logger(args, paths, params):
                           config=asdict(params), **wandb_kwargs,)
     
     return logger, wandb_run_name, time_now
+
+
+def setup_ckpt_path(args, paths, params, wandb_run_name, time_now):
+    resume_ckpt_path = None
+    if params.general.resume_training:  # Resume training
+        assert params.general.resume_ckpt_path != None, "The path for checkpoint is not provided."
+        resume_ckpt_path = Path(paths.log_folder) / params.general.resume_ckpt_path
+        ckpt_dir = resume_ckpt_path.parent
+        if wandb_run_name != ckpt_dir.parent.name and wandb_run_name is not None:
+            ckpt_dir = resume_ckpt_path.parent.parent.parent / wandb_run_name / time_now
+        print(f"ckpt_dir: {ckpt_dir}")
+        print(f"Resuming from checkpoint: {resume_ckpt_path}")
+    else:
+        ckpt_dir = os.path.join(f"{paths.log_folder}/checkpoints_{args.module}/{wandb_run_name}/{time_now}")
+    return ckpt_dir, resume_ckpt_path
 
 
 def initialize_ckpt_args(args, params):
