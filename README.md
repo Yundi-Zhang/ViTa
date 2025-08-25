@@ -109,7 +109,7 @@ This project uses `.npz` files to store processed image data. Each `.npz` file c
 - **`seg_sax`**: Segmentation maps for short-axis images.
 - **`seg_lax`**: Segmentation maps for long-axis images.
 
-#### Example Structure fo preprocessed data
+#### Example Structure of preprocessed data
 
 The `.npz` file contains a dictionary like this:
 
@@ -121,7 +121,9 @@ The `.npz` file contains a dictionary like this:
   "seg_lax": np.array of shape (H, W, S, T)
 }
 ```
+#### Processed tabular data
 
+Please make sure to run the files in **`datasets/preprocessing_tabular`** to preprocess that tabular data.
 
 ## Usage
 This project supports four tasks: 
