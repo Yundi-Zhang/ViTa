@@ -22,7 +22,7 @@ from utils.logging_related import imgs_to_wandb_video
 from utils.utils_visualization import plot_one_label
 
 
-with open('datasets/data_files/tabular_files/feature_names_input.json', 'r') as f:
+with open('datasets/data_files/tabular_files/feature_names.json', 'r') as f:
     FEATURE_NAMES_IN = json.load(f)
     
 
