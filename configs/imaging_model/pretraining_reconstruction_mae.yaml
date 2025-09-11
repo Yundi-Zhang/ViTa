@@ -1,13 +1,12 @@
 general:
-  seed: 1 # 1 for 0.7 mask ratio, 32 for 0.9
-  wandb_entity: # your wandb entity
+  seed: 1
   wandb_disabled: "false"
   wandb_run_id: 
   freeze_encoder: False
   load_encoder: False
   load_decoder: False
   resume_training: False
-  resume_ckpt_path: 
+  resume_ckpt_path: ""
 
 
 trainer:
@@ -18,16 +17,12 @@ trainer:
 
 data:
   ignore_phenotype_tabular: True
-  cmr_path_pickle_name: "recon_cmr_subject_paths_50k_new.pkl" # The pickle file name containing all CMR image paths
-  subj_ids_with_required_size_pickle_name: "subj_ids_with_required_size.pkl" # The pickle file name containing IDs of all subjects with required size
-  replace_processed: False
-  data_filtering: False
+  cmr_path_pickle_name: "cmr_paths.pkl"
   sax_slice_num: 6 # 6 for 3D, 1 for 2D
   image_size: [128, 128]
   t_downsampling_ratio: 1
   frame_to_keep: 25
   train_num_per_epoch: 1000
-  idx_start: 0
   num_train: 42000
   num_val: 1000
   num_test: 2000
@@ -38,10 +33,10 @@ data:
 
 module:
   task_idx: 0 # reconstrucion: 0, regression: 1, segmentation: 2
-  module_idx: 0 # ReconMAE: 0, CLReconMAE: 1, DisentangleReconMAE: 2
+  module_idx: 0 # ReconMAE: 0
   
   recon_hparams:
-    enc_embed_dim: 1025 # 1025, 715, 1015, 1525
+    enc_embed_dim: 1025
     enc_depth: 6
     enc_num_heads: 5
     dec_embed_dim: 1025
@@ -49,7 +44,7 @@ module:
     dec_num_heads: 5
 
   training_hparams:
-    patch_embed_cls: "PatchEmbed" # PatchEmbed_Spatial, PatchEmbed
+    patch_embed_cls: "PatchEmbed"
     patch_size: [5, 8, 8]
     pixel_unshuffle_scale: 1
     circular_pe: False

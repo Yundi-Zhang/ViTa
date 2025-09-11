@@ -17,7 +17,6 @@ MONITOR_LUT = {
                 ("val_MAE", "model-{epoch:03d}-{val_MAE:.2f}", "min"), # Regression
                 ("val_Dice_FG", "model-{epoch:03d}-{val_Dice_FG:.2f}", "max"), # Segmentation
                 ],
-    "tabular": [("val_classifier_auc", "model-{epoch:03d}-{val_classifier_auc:.2f}", "max")],
     "imaging_tabular": [("val_loss", "model-{epoch:03d}-{val_loss:.2f}", "min"), # Pretraining
                         ("ckpt_metric", "model-{epoch:03d}-{ckpt_metric:.2f}", "min"), # Tabular Reconstruction
                         ],
@@ -34,7 +33,7 @@ def initialize_wandb_logger(args, paths, params):
     time_now = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
 
     wandb_kwargs = dict()
-    wandb_kwargs["entity"] = params.general.wandb_entity
+    wandb_kwargs["entity"] = os.environ["WANDB_ENTITY"]
     wandb_kwargs["group"] = args.wandb_group_name if args.wandb_group_name is not None else params.general.wandb_group_name
     wandb_kwargs["name"] = f"{wandb_run_name}_{time_now}"
     wandb_kwargs["resume"] = "allow" # Resume if the run_id is provided and identical to a previous run otherwise, start a new run
@@ -91,7 +90,7 @@ def initialize_parameters(args):
     # Override the default parameters by the given configuration file
     if args.module == "imaging":
         params = load_imaging_model_config_from_yaml(config_path)
-    elif args.module in ["tabular", "imaging_tabular"]:
+    elif args.module == "imaging_tabular":
         params = load_imaging_tabular_model_config_from_yaml(config_path)
     else:
         raise ValueError("We only support imaging or imaging_tabular module")

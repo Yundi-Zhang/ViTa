@@ -1,41 +1,33 @@
 from pathlib import Path
 
-from typing import List, Optional
+import pickle
+from typing import List
 import lightning.pytorch as pl
 import pandas as pd
 from termcolor import colored
 import torch
 from torch.utils.data import DataLoader, RandomSampler
 
-from datasets.imaging_preprocessing import load_image_paths
 from datasets.datasets import *
 from datasets.datasets import AbstractDataset, AbstractDataset_Test
 from datasets.imaging_tabular_dataloader import RandomDistributedSampler
 
 
 class CMRImageDataModule(pl.LightningDataModule):
-    def __init__(self, load_dir: str, # Image
-                 processed_dir: str,  # Image
-                 dataloader_image_file_folder: str, # Image
-                 dataloader_tabular_file_folder: str, # Image
-                 cmr_path_pickle_name: str, # Image
-                 subj_ids_with_required_size_pickle_name: str, # Image
-                 
+    def __init__(self, 
+                 dataloader_image_file_folder: str,
+                 dataloader_tabular_file_folder: str,
+                 cmr_path_pickle_path: str,
                  ):
         super().__init__()
         
-        # For image loading
-        self.load_dir = load_dir
-        self.processed_dir = processed_dir
         self.dataloader_image_file_folder = dataloader_image_file_folder
         self.dataloader_tabular_file_folder = dataloader_tabular_file_folder
-        self.cmr_path_pickle_dir = Path(dataloader_image_file_folder) / cmr_path_pickle_name
-        self.subj_ids_dir = Path(dataloader_image_file_folder) / subj_ids_with_required_size_pickle_name
+        self.cmr_path_pickle_path = cmr_path_pickle_path
         
         self.train_dset = None
         self.val_dset = None
         self.test_dset = None
-        Path(processed_dir).mkdir(parents=True, exist_ok=True)
         Path(dataloader_image_file_folder).mkdir(parents=True, exist_ok=True)
         Path(dataloader_tabular_file_folder).mkdir(parents=True, exist_ok=True)
         
@@ -46,8 +38,10 @@ class CMRImageDataModule(pl.LightningDataModule):
             return
         # -----------------------------------------------------------------------------------------------
         # Load image paths
-        paths = load_image_paths(path_dir=self.cmr_path_pickle_dir, subj_ids_dir=self.subj_ids_dir,
-                                 load_dir=self.load_dir, processed_dir=self.processed_dir, **kwargs)
+        with open(self.cmr_path_pickle_path, 'rb') as file:
+            paths = pickle.load(file)
+        imgs_n = len(paths["train"]) + len(paths["val"]) + len(paths["test"])
+        print(f"Loaded {imgs_n} images from {self.cmr_path_pickle_path}.")
         num_train = kwargs.get("num_train")
         num_val = kwargs.get("num_val")
         num_test = kwargs.get("num_test")

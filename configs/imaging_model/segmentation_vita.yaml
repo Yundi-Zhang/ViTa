@@ -1,20 +1,16 @@
 general:
   seed: 1
-  wandb_entity:  # your wandb entity
   wandb_disabled: "false"
   wandb_run_id: 
   freeze_encoder: False
   resume_training: False
   load_encoder: True
-  resume_ckpt_path: "" # the ckpt for pretrained imaging model
+  resume_ckpt_path: "checkpoints_imaging/downstream_seg_mae_allax.ckpt" # the ckpt for pretrained imaging model
 
 
 data:
   ignore_phenotype_tabular: False
-  cmr_path_pickle_name: "recon_cmr_subject_paths_50k_new.pkl" # The pickle file name containing all CMR image paths
-  subj_ids_with_required_size_pickle_name: "subj_ids_with_required_size.pkl" # The pickle file name containing IDs of all subjects with required size
-  target_tabular_data: "raw_tab.csv"
-  replace_processed: False
+  cmr_path_pickle_name: "cmr_paths.pkl"
   sax_slice_num: 6 # 6 for 3D, 1 for 2D
   image_size: [128, 128]
   train_num_per_epoch: 1000

@@ -64,11 +64,10 @@ class BasicModule(pl.LightningModule):
             self.module_logger.update_metric_item(f"{mode}/recon_{loss_name}", loss_value.detach().item(), mode=mode)
         self.module_logger.update_metric_item(f"{mode}/recon_psnr", psnr_value, mode=mode)
     
-    def log_recon_videos(self, mask, pred_patches, gt_imgs, sub_idx, mode="train"):
+    def log_recon_videos(self, pred_patches, gt_imgs, sub_idx, mode="train"):
         sub_path = eval(f"self.trainer.datamodule.{mode}_dset").subject_paths[sub_idx]
         sub_id = sub_path.parent.name
         # Extend batch dimension for calculation
-        mask = mask[None]
         pred_patches = pred_patches[None]
         gt_imgs = gt_imgs[None]
         # Prepare for wandb video logging: (B, S, T, H, W) -> (T, C, H, W)
@@ -144,10 +143,10 @@ class ReconMAE(BasicModule):
         if self.current_epoch > 0 and ((self.current_epoch + 1) % log_rate == 0):
             if (sub_idx == 0).any():
                 i = (sub_idx == 0).argwhere().squeeze().item()
-                self.log_recon_videos(mask[i], pred_patches[i], imgs[i], sub_idx[i], mode=mode)
+                self.log_recon_videos(pred_patches[i], imgs[i], sub_idx[i], mode=mode)
             if (sub_idx == 1).any():
                 i = (sub_idx == 1).argwhere().squeeze().item()
-                self.log_recon_videos(mask[i], pred_patches[i], imgs[i], sub_idx[i], mode=mode)
+                self.log_recon_videos(pred_patches[i], imgs[i], sub_idx[i], mode=mode)
         return loss_dict["loss"]
     
     @torch.no_grad()
@@ -165,17 +164,18 @@ class ReconMAE(BasicModule):
         psnr_value = np.mean(psnr_value, axis=2)
         self.test_psnr.append(psnr_value)
 
-        imgs = imgs.detach().cpu().numpy()
-        pred_imgs = pred_imgs.detach().cpu().numpy()
-
         # Save sample images
-        if self.hparams.test_sample_path is not None:
-            if (sub_idx == 0).any():
-                i = (sub_idx == 0).argwhere().squeeze().item()
-                sample_imgs = imgs[i]
-                sample_recon_imgs = pred_imgs[i]
+        if (sub_idx == 0).any():
+            i = (sub_idx == 0).argwhere().squeeze().item()
+            sample_imgs = imgs[i]
+            sample_recon_imgs = pred_imgs[i]
+            self.log_recon_videos(pred_patches[i], imgs[i], sub_idx[i], mode="test")
+
+            if self.hparams.test_sample_path is not None:
                 Path(self.hparams.test_sample_path).mkdir(parents=True, exist_ok=True)
                 view_name = self.hparams.test_sample_path.split('_')[-1]
+                sample_imgs = sample_imgs.detach().cpu().numpy()
+                sample_recon_imgs = sample_recon_imgs.detach().cpu().numpy()
                 for k in range(sample_imgs.shape[0]):
                     gt = sample_imgs[k, 13]
                     recon = sample_recon_imgs[k, 13]
@@ -206,10 +206,19 @@ class ReconMAE(BasicModule):
         results = {"psnr_mean": psnr_mean, "psnr_std": psnr_std, 
                    "psnr_sax_mean": psnr_sax_mean, "psnr_sax_std": psnr_sax_std, 
                    "psnr_lax_mean": psnr_lax_mean, "psnr_lax_std": psnr_lax_std, }
+        
+        # Table logging
+        columns = list(results.keys())
+        test_table = wandb.Table(columns=columns)
+        test_table.add_data(*[results[col] for col in columns])
+        wandb.log({"Evaluation_table": test_table})
+
         if self.hparams.test_psnr_path is not None:
             Path(self.hparams.test_psnr_path).parent.mkdir(parents=True, exist_ok=True)
             with open(self.hparams.test_psnr_path, "wb") as file:
                 pickle.dump(results, file)
+
+        self.wandb_log(self.current_epoch, mode="test")
                 
     @torch.no_grad()
     def generate_latents(self, data_loader, 

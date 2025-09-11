@@ -5,7 +5,7 @@ import gc
 from lightning import Trainer, seed_everything
 from lightning.pytorch.callbacks import ModelCheckpoint
 
-from utils.general import get_data_paths, parser_command_line
+from utils.general import download_checkpoints, get_data_paths, parser_command_line
 from initializers.initialize_dataloader import initialize_dataloader
 from initializers.initialize_model import initialize_model
 from initializers.initialize_parameters import initialize_parameters, setup_ckpt_path, initialize_ckpt_args, initialize_wandb_logger
@@ -21,6 +21,9 @@ def run():
     params = initialize_parameters(args)
     seed_everything(params.general.seed, workers=True) # Sets seeds for numpy, torch and python.random.
 
+    # Download checkpoint from Hugging Face
+    download_checkpoints(repo_id="UKBB-Foundational-Models/ViTa", log_dir=paths.log_folder) #TODO
+    
     # Initialize wandb logging
     logger, wandb_run_name, time_now = initialize_wandb_logger(args, paths, params)
 
@@ -32,7 +35,10 @@ def run():
     
     # Check the resuming and loading of the checkpoints
     ckpt_dir, resume_ckpt_path = setup_ckpt_path(args, paths, params, wandb_run_name, time_now)
-    
+    if resume_ckpt_path is not None:
+        state_dict = torch.load(resume_ckpt_path, weights_only=False)["state_dict"]
+        model.load_state_dict(state_dict, strict=False)
+
     # Monitor foreground dice for segmentation. When reconstruction, monitor PSNR. MAE for regression.
     monitor_metric, ckpt_filename, monitor_mode = initialize_ckpt_args(args, params)
             

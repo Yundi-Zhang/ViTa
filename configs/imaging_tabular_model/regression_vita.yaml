@@ -1,10 +1,9 @@
 general:
-  seed: 1 # 1 for 0.7 mask ratio, 32 for 0.9
-  wandb_entity:  # your wandb entity
+  seed: 1
   wandb_disabled: "false"
   wandb_run_id: 
   resume_training: False
-  resume_ckpt_path: 
+  resume_ckpt_path: ""
 
 
 trainer:
@@ -16,7 +15,6 @@ trainer:
 data:
   general_data:
     train_num_per_epoch: 10000 # Must to be the integer multiple of batch size for multigpus
-    idx_start: 0
     num_train: 42000
     num_val: 1500
     num_test: 1000
@@ -26,18 +24,15 @@ data:
 
   imaging_data:
     ignore_phenotype_tabular: True
-    cmr_path_pickle_name: "recon_cmr_subject_paths_50k_new.pkl" # The pickle file name containing all CMR image paths
-    subj_ids_with_required_size_pickle_name: "subj_ids_with_required_size.pkl" # The pickle file name containing IDs of all subjects with required size
-    replace_processed: False
-    data_filtering: False
+    cmr_path_pickle_name: "cmr_paths.pkl"
     sax_slice_num: 6 # 6 for 3D, 1 for 2D
     image_size: [128, 128]
     frame_to_keep: 5
     augment: True
 
   tabular_data:
-    tabular_data: "preprocessed_tab_paul.csv" # the csv file of processed tabular data
-    raw_tabular_data: "raw_tab_paul_new.csv" # the csv file of raw target tabular data
+    tabular_data: "input_tab.csv" # the csv file of processed tabular data
+    raw_tabular_data: "raw_tab.csv" # the csv file of raw target tabular data
     corruption_rate: 0.3
     one_hot_tabular: False
     tab_augment: False
@@ -56,7 +51,7 @@ module:
   imaging_hparams:
     load_imaging_encoder: True
     freeze_imaging_encoder: False
-    imaging_ckpt_path: "" # the ckpt of pretrained imaging-tabular model
+    imaging_ckpt_path: "checkpoints_imaging_tabular/pretrain_vita.ckpt" # the ckpt of pretrained imaging-tabular model
     patch_embed_cls: "PatchEmbed" # PatchEmbed_Spatial, PatchEmbed
     patch_size: [5, 8, 8]
     pixel_unshuffle_scale: 1
@@ -95,7 +90,7 @@ module:
     decoder_type: "linear" # "linear", "linear_cls", "pool", "pool_cls"
     decoder_head_type: "numerical" # "numerical", "single_categorical", "multi_categorical"
     use_scalor: False
-    selected_features: ["LVEDV (mL)", "LVESV (mL)", "LVSV (mL)", "LVEF (%)", "LVCO (L/min)", "LVM (g)", "RVEDV (mL)", "RVESV (mL)", "RVSV (mL)", "RVEF (%)", "LAV max (mL)", "LAV min (mL)", "LASV (mL)", "LAEF (%)", "RAV max (mL)", "RAV min (mL)", "RASV (mL)", "RAEF (%)"] # the name of selected target features
+    selected_features: ["LVEDV (mL)", "LVESV (mL)", "LVSV (mL)", "LVEF (%)", "LVCO (L/min)", "LVM (g)", "RVEDV (mL)", "RVESV (mL)", "RVSV (mL)", "RVEF (%)"] # ["LAV max (mL)", "LAV min (mL)", "LASV (mL)", "LAEF (%)", "RAV max (mL)", "RAV min (mL)", "RASV (mL)", "RAEF (%)"] # the name of selected target features
 
   training_hparams:
     # Logging

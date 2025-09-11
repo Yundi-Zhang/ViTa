@@ -1,35 +1,33 @@
+import os
+from pathlib import Path
+import pickle
+import time
 from uu import Error
 import numpy as np
-import os
-import pandas as pd
+from torch.utils.data import random_split
+from uu import Error
 import tqdm
 from typing import List, Union, Optional, Callable, Tuple
-import time
 import nibabel as nib
-from pathlib import Path
-import os
 
 
-def get_biggest_2D_slice_bbox(segmentation: np.ndarray, padding: int = 10, **kwargs) \
-        -> np.ndarray:  # [Y1, X1, Y2, X2]
-    """ Collapse all non-height/width dimensions into a 2D mask using the max operation
-     such that the largest slice/frame is taken into account.
-     Then find max and min indices of foreground mask to create the tightest possible bbox.
-     Add padding to bbox by taking into account image"s edges"""
-    if len(segmentation.shape) > 2:
-        non_slice_dims = tuple(range(2, len(segmentation.shape)))
-        segmentation = segmentation.max(axis=non_slice_dims)
-    indices = np.argwhere(segmentation > 0)
-    min_indices = indices.min(0) - padding
-    min_indices = np.maximum(min_indices, 0)
-    assert len(min_indices) == 2
-    max_indices = indices.max(0) + padding
-    max_indices = np.minimum(max_indices, np.array(segmentation.shape[:2]) - 1)
-    assert len(max_indices) == 2
-    bbox = np.concatenate((min_indices, max_indices), axis=0)
-    return bbox
+# --- Envorinments variables --- #
+IMAGE_SIZE = Path(os.environ["IMAGE_SIZE"])               # Desired image crop size (e.g., [128,128])
+MAX_NUM_TRAIN = Path(os.environ["MAX_NUM_TRAIN"])         # Maximum number of training subjects
+MAX_NUM_VAL = Path(os.environ["MAX_NUM_VAL"])             # Maximum number of validation subjects
+MAX_NUM_TEST = Path(os.environ["MAX_NUM_TEST"])           # Maximum number of test subjects
+
+IMAGE_DATA_ROOT = Path(os.environ["IMAGE_DATA_ROOT"])     # Root folder containing raw NIfTI images
+IMAGE_PROCESS_ROOT = Path(os.environ["IMAGE_PROCESS_ROOT"]) # Folder to save preprocessed .npz files
+IMAGE_SUBJ_PATH = Path(os.environ["IMAGE_SUBJ_PATH"]) # Path to pickle file storing train/val/test image paths
+SELECTED_IDS_PICKLE = Path(os.environ["SELECTED_IDS_PICKLE"]) # Path to pickle file storing selected subject IDs
 
 
+# --- Configurations --- #
+replace_processed = False
+
+
+# --- Utility Functions --- #
 def get_2D_slice_bbox_with_fixed_size(segmentation: np.ndarray, bbox_size: List[int] = [128, 128]) \
         -> np.ndarray:  # [Y1, X1, Y2, X2]
     """Find the biggest 2D slice and then crop or padding it into descired bbox_size"""
@@ -60,78 +58,11 @@ def get_2D_central_bbox(im_size, bbox_size: List[int] = [128, 128]) \
     return bbox
 
 
-def find_healthy_subjects(path):
-        """Find healthy subjects indices in the dataset."""
-        df = pd.read_csv(path)
-        conditions = {
-            "977:981": [1, 2], # Overall health rating: Excellent
-            # "3325:3337": [-7], # Vascular/heart problems diagnosed by doctor: None of the above
-            # "1033:1037": [0], # Diabetes diagnosed by doctor: No
-            # "4218:4410": np.nan, # Treatment/medication code
-            # "6603": [113, 114], # Tobacco smoking: Never smoked
-            # "6359": [-600], # Degree bothered by feeling heart pound/race in the last 3 months: Not bothered at all
-            "10362": np.nan, # Date E66 first reported (obesity)
-            "10229": np.nan, # Date of myocardial infarction
-            "10377": np.nan, # Date Date I21 first reported (acute myocardial infarction)
-            # "10357": np.nan, # Date E10 first reported (insulin-dependent diabetes mellitus)
-        }
-        cond = np.ones(df.shape[0], dtype=bool)
-        for key, val in conditions.items():
-            if key in ["977:981", "3325:3337", "1033:1037"]:
-                # select rows where the column is either nan or the value
-                cond1 = np.all(eval(f"df.iloc[:, {key}].isna() | df.iloc[:, {key}].isin({val})"), axis=1)
-                cond2 = np.all(eval(f"df.iloc[:, {key}].isna()"), axis=1)
-                # select rows where the column is either nan or the value provided but not all nan
-                cond_tmp = cond1 & ~cond2
-            elif key == "4218:4410":
-                cond_tmp = np.all(eval(f"df.iloc[:, {key}].isna()"), axis=1)
-            else:
-                if np.isnan(val).all():
-                    cond_tmp = eval(f"df.iloc[:, {key}].isna()")
-                else:
-                    cond_tmp = eval(f"df.iloc[:, {key}].isin({val})")
-            cond &= cond_tmp
-        indices = np.where(cond)
-        eid = df.iloc[indices]["eid"]
-        return eid
-    
-    
-def find_extreme_unhealthy_subjects(path):
-        """Find healthy subjects indices in the dataset."""
-        df = pd.read_csv(path)
-        conditions = {
-            "977:981": [1, 2], # Overall health rating: Excellent
-            # "3325:3337": [-7], # Vascular/heart problems diagnosed by doctor: None of the above
-            # "1033:1037": [0], # Diabetes diagnosed by doctor: No
-            # "4218:4410": np.nan, # Treatment/medication code
-            # "6603": [113, 114], # Tobacco smoking: Never smoked
-            # "6359": [-600], # Degree bothered by feeling heart pound/race in the last 3 months: Not bothered at all
-            "10362": np.nan, # Date E66 first reported (obesity)
-            "10229": np.nan, # Date of myocardial infarction
-            "10377": np.nan, # Date Date I21 first reported (acute myocardial infarction)
-            # "10357": np.nan, # Date E10 first reported (insulin-dependent diabetes mellitus)
-        }
-        cond = np.ones(df.shape[0], dtype=bool)
-        for key, val in conditions.items():
-            if key in ["977:981", "3325:3337", "1033:1037"]:
-                # select rows where the column is either nan or the value
-                cond1 = np.all(eval(f"df.iloc[:, {key}].isna() | df.iloc[:, {key}].isin({val})"), axis=1)
-                cond2 = np.all(eval(f"df.iloc[:, {key}].isna()"), axis=1)
-                # select rows where the column is either nan or the value provided but not all nan
-                cond_tmp = cond1 & ~cond2
-            elif key == "4218:4410":
-                cond_tmp = np.all(eval(f"df.iloc[:, {key}].isna()"), axis=1)
-            else:
-                if np.isnan(val).all():
-                    cond_tmp = eval(f"df.iloc[:, {key}].isna()")
-                else:
-                    cond_tmp = eval(f"df.iloc[:, {key}].isin({val})")
-            cond &= cond_tmp
-        indices = np.where(cond)
-        eid = df.iloc[indices]["eid"]
-        return eid
-
-
+# --- Step 1: Find Subject IDs --- #
+# Search through the raw image directory and collect IDs of subjects that meet:
+# - Minimum number of SAX slices
+# - Correct number of frames
+# - Proper resolution
 def find_indices_of_images(load_dir: Union[str, Path],
                            sax_file_name="sa.nii.gz",
                            seg_file_name="seg_sa.nii.gz",
@@ -141,67 +72,48 @@ def find_indices_of_images(load_dir: Union[str, Path],
                            sax_bbox_size: Tuple[int, int] = [128, 128],
                            lax_bbox_size: Tuple[int, int] = [128, 128],
                            id_list: Optional[list] = None,):
-    """ Find the indices of the SAX and LAX images in the given path that have enough sax slices and match given spatial dimensions. If id_list is not None, then return the union of the indices.
-    
-    :param load_dir: Data directory where subjects are layed out.
-    :param img_file_name: Naming convention of the short axis image files you are intending to extract.
-    :param seg_file_name: Naming convention of the segmentation files you are intending to extract.
-    :param lax_file_name: Naming convention of the long axis image files you are intending to extract.
-    :param sax_bbox_func: Function to be used to extract bounding boxes for short axis images. 
-                          Should follow format [Y1, X1, ..., Y2, X2, ...]
-    :param lax_bbox_func: Function to be used to extract bounding boxes for long axis images. 
-    :param sax_bbox_size: the size of sax bounding box
-    :param lax_bbox_size: the size of lax bounding box
-    :param id_list: List of subject ids that we search among.
+    """
+    Return list of subject IDs satisfying SAX/LAX image quality requirements.
+    If id_list is given, only subjects in id_list are considered.
     """
     indices = []
     load_dir = Path(load_dir)
-    # Used to collect dataset statistics if necessary
     for i, parent in enumerate(sorted(os.listdir(str(load_dir)))):
-        # If id_list is not None, then only extract the images with the indices in the id_list.
-        if id_list is not None: 
-            if int(parent) not in id_list:
-                continue
+        if id_list is not None and int(parent) not in id_list:
+            continue
 
         im_path = load_dir / parent / sax_file_name
         seg_path = load_dir / parent / seg_file_name
         lax_path = [load_dir / parent / i for i in lax_file_name]
-        
+
         # Make sure both image and segmentation files exist
-        if not os.path.exists(im_path):
+        if not os.path.exists(im_path) or not os.path.exists(seg_path) or not all(os.path.exists(p) for p in lax_path):
             continue
-        if not os.path.exists(seg_path):
-            continue
-        if not all(os.path.exists(path) for path in lax_path):
-            continue
+
         try:
-            # Short axis image should have at least 9 slices and 50 frames
             im = nib.load(im_path)
-            if im.shape[2] < 6:
-                print(f"Found an image with suspiciously low number of SAX slices: {im.shape[2]} slices. {im_path.parent.name}")
+            # Check slice and frame count
+            if im.shape[2] < 6 or im.shape[3] != 50:
+                print(f"Found an image with suspiciously low number of SAX slices/frames: {im.shape[2]} slices. {im.shape[3]} frames. {im_path.parent.name}")
                 continue
-            if im.shape[3] != 50:
-                print(f"Found an image with suspicious number of SAX frames: {im.shape[3]} frames. {im_path.parent.name}")
+            if sax_bbox_func and (im.shape[0] < sax_bbox_size[0] or im.shape[1] < sax_bbox_size[1]):
+                print(f"Found an SAX image with suspiciously low resolution: {im.shape[0:2]} pixels. {im_path.parent.name}")
                 continue
-            if sax_bbox_func is not None:
-                if im.shape[0] < sax_bbox_size[0] or im.shape[1] < sax_bbox_size[1]:
-                    print(f"Found an SAX image with suspiciously low resolution: {im.shape[0:2]} pixels. {im_path.parent.name}")
-                    continue
-            # Long axis image should have 50 frames
-            lax_ims = [nib.load(path) for path in lax_path]
-            if not all(lax_im.shape[3] == 50 for lax_im in lax_ims):
+            lax_ims = [nib.load(p) for p in lax_path]
+            if not all(l.shape[3] == 50 for l in lax_ims):
                 print(f"Found an image with suspicious number of LAX frames: {lax_ims[0].shape[3], lax_ims[1].shape[3], lax_ims[3].shape[3]} frames. {im_path.parent.name}")
                 continue
-            if lax_bbox_func is not None:
-                if not all(lax_im.shape[0] >= lax_bbox_size[0] and lax_im.shape[1] >= lax_bbox_size[1] for lax_im in lax_ims):
-                    print(f"Found an LAX image with suspiciously low resolution: {lax_ims[0].shape[0:2], lax_ims[1].shape[0:2], lax_ims[2].shape[0:2]} pixels. {im_path.parent.name}")
-                    continue
+            if lax_bbox_func and not all(l.shape[0] >= lax_bbox_size[0] and l.shape[1] >= lax_bbox_size[1] for l in lax_ims):
+                print(f"Found an LAX image with suspiciously low resolution: {lax_ims[0].shape[0:2], lax_ims[1].shape[0:2], lax_ims[2].shape[0:2]} pixels. {im_path.parent.name}")
+                continue
             indices.append(int(parent))
-        except Exception as e:
+        except Exception:
             continue
     return indices
 
 
+
+# --- Step 2: Preprocess Selected Subjects into .npz --- #
 def process_cmr_images(load_dir: Union[str, Path],
                        prep_dir: Union[str, Path],
                        num_cases: int = -1,
@@ -218,22 +130,8 @@ def process_cmr_images(load_dir: Union[str, Path],
                        id_list: Optional[list] = None,
                        replace_processed: Optional[bool] = False,):
     """
-    :param load_dir: Data directory where subjects are layed out.
-    :param prep_dir: Directory where processed data will be saved.
-    :param num_cases: Number of subjects to extract before breaking out of the data gathering loop.
-                      If value is negative, collect all subjects.
-    :param case_start_idx: Index of subject at which to start. Used to avoid loading same subjects
-                            into train/val/test datasets. Ex: If you want to use 1000 subjects for
-                            training and 100 for validation -> Train_start_idx = 0, Val_start_idx = 1000
-    :param bbox_func: Function to be used to extract bounding boxes.
-                      Should follow format [Y1, X1, ..., Y2, X2, ...]
-    :param sax_bbox_size: the size of sax bounding box
-    :param lax_bbox_size: the size of lax bounding box
-    :param img_file_name: Naming convention of the image files you are intending to extract.
-    :param seg_file_name: Naming convention of the segmentation files you are intending to extract.
-    :param id_list: The id list from target dataframe.
-    
-    :return processed_npy_paths: List of paths to the processed npy files.
+    Preprocess the raw NIfTI images into .npz arrays for selected subjects.
+    Crops SAX/LAX images to bounding boxes, stacks LAX views, saves .npz per subject.
     """
     assert num_cases != 0
     assert os.path.exists(prep_dir), f"Processed directory {prep_dir} does not exist."
@@ -355,23 +253,79 @@ def process_cmr_images(load_dir: Union[str, Path],
     return processed_case_ids
 
 
-def get_subject_sax_range(npy_path: Path, z_num: Optional[int]=None,) -> Tuple[np.ndarray, np.ndarray]:
+# --- Step 3: Create Pickle File with All .npz Paths --- #
+def process_image_and_save_paths(path_dir: str, 
+                                 subj_ids_dir: str, 
+                                 load_dir: str, 
+                                 processed_dir: str,
+                                 processed_file_name: str, 
+                                 num_train: int, 
+                                 num_val: int, 
+                                 num_test: int,
+                                 idx_start: int,
+                                 image_size: list[int] = [128, 128],
+                                 replace_processed: bool = False,
+                                 ):
+    """
+    - Load or compute selected subject IDs
+    - Preprocess raw NIfTI to .npz for selected IDs
+    - Split processed .npz into train/val/test
+    - Save paths dictionary as pickle
+    """
+    if os.path.exists(subj_ids_dir):
+        with open(subj_ids_dir, 'rb') as file:
+            subject_ids = pickle.load(file)
+    else:
+        subj_ids = find_indices_of_images(load_dir, sax_bbox_size=image_size, lax_bbox_size=image_size)
+        subject_ids = process_cmr_images(load_dir=load_dir, 
+                                         prep_dir=processed_dir, 
+                                         file_name=processed_file_name,
+                                         sax_bbox_size=image_size,
+                                         lax_bbox_size=image_size, 
+                                         replace_processed=replace_processed,
+                                         id_list=subj_ids)
+        subject_ids = sorted(subject_ids)
+        with open(subj_ids_dir, 'wb') as file:
+            pickle.dump(subject_ids, file)
 
-    assert os.path.exists(npy_path), f"File not found: {npy_path}"
-    if npy_path.name[-4:] == ".npy":
-        process_npy = np.load(npy_path, allow_pickle=True).item()
-    elif npy_path.name[-4:] == ".npz":
-        process_npy = np.load(npy_path)
-        
-    sax_im_data = process_npy["sax"] # [H, W, S, T]
-    seg_sax_data = process_npy["seg_sax"] # [H, W, S, T]
+    # Split into train/val/test paths
+    subject_paths = [Path(processed_dir) / str(parent) / Path(processed_file_name) for parent in subject_ids]
+    split = (num_train, num_val, num_test)
+    topk_paths = subject_paths[idx_start : (sum(split) + idx_start)]
+    train_idxs, val_idxs, test_idxs = [list(s) for s in random_split(list(range(len(topk_paths))), split)]
+    paths = {
+        "train": [topk_paths[i] for i in train_idxs],
+        "val": [topk_paths[i] for i in val_idxs],
+        "test": [topk_paths[i] for i in test_idxs]
+    }
+    with open(path_dir, 'wb') as handle:
+        pickle.dump(paths, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    return paths
+
+
+
+
+# --- Main Execution --- #
+# Load existing pickle with train/val/test .npz paths or preprocess everything if missing/replaced
+try:
+    if replace_processed:
+        raise Error("Reprocess the image data")
     
-    # Select only the from 3rd to 3+z_num slices with segmentation map
-    if z_num is not None:
-        z_seg_start = (seg_sax_data[..., 0] == 1).any((0, 1)).argmax() + 2
-        z_max = min(z_seg_start + z_num, seg_sax_data.shape[-2])
-        z_min = z_max - z_num
-        seg_sax_data = seg_sax_data[..., z_min : z_max, :] # [H, W, z_num, T]
-        sax_im_data = sax_im_data[..., z_min : z_max, :]
-        assert sax_im_data.shape[-2] == z_num, f"Img path: {npy_path}, shape: {sax_im_data.shape}"
-    return z_min, z_max
+    with open(IMAGE_SUBJ_PATH, 'rb') as file:
+        paths = pickle.load(file)
+    imgs_n = len(paths["train"]) + len(paths["val"]) + len(paths["test"])
+    print(f"Loaded {imgs_n} images from {IMAGE_SUBJ_PATH}.")
+
+except:
+    paths = process_image_and_save_paths(path_dir=IMAGE_SUBJ_PATH, 
+                                         subj_ids_dir=SELECTED_IDS_PICKLE, 
+                                         load_dir=IMAGE_DATA_ROOT, 
+                                         processed_dir=IMAGE_PROCESS_ROOT,
+                                         processed_file_name="processed_seg_allax.npz", 
+                                         num_train=MAX_NUM_TRAIN, 
+                                         num_val=MAX_NUM_VAL, 
+                                         num_test=MAX_NUM_TEST,
+                                         idx_start=0,
+                                         image_size=IMAGE_SIZE,
+                                         replace_processed=replace_processed)

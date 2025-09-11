@@ -109,6 +109,12 @@ class SegMAE(BasicModule):
 
         _, dice_scores = self.segmentation_criterion(pred_segs_, gt_segs_, mode="test")
 
+        # Log segmentation sample
+        if (sub_idx == 0).any():
+            i = (sub_idx == 0).argwhere().squeeze().item()
+            pred_seg = torch.argmax(pred_segs_[i], dim=0).detach()
+            self.log_seg_videos(imgs[i], segs[i], pred_seg, sub_idx[i], mode="test")
+
         pred_segs_ = pred_segs_.moveaxis(1, 2)
         gt_segs_ = gt_segs_.moveaxis(1, 2)
         B, S = pred_segs_.shape[:2]
@@ -156,6 +162,7 @@ class SegMAE(BasicModule):
             table.add_data("Dice_LA", test_dice_scores[-2].mean().detach().item(), test_dice_scores[-2].std().detach().item())
             table.add_data("Dice_RA", test_dice_scores[-1].mean().detach().item(), test_dice_scores[-1].std().detach().item())
         wandb.log({"Evaluation_table": table})
+        self.wandb_log(self.current_epoch, mode="test")
         return test_dice_scores
         
     def log_seg_metrics(self, loss, dice_score, mode="train"):

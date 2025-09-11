@@ -232,10 +232,9 @@ class ViTaBinaryClassification(pl.LightningModule):
         self.test_ap.reset()
 
         # Table logging
-        test_table = wandb.Table(columns=["Feature name", "accuracy", "f1 score", "auc-roc", "precision", "Average Precision", "recall"])
+        test_table = wandb.Table(columns=["Feature name", "auc-roc", "f1 score", "recall", "precision", "Average Precision"])
 
-        test_table.add_data(self.hparams.tabular_hparams.selected_features[0], 
-                            acc, f1, auc, precision, ap, recall)
+        test_table.add_data(self.hparams.tabular_hparams.selected_features[0], auc, f1, recall, precision, ap)
         wandb.log({"Evaluation_table": test_table})
 
 
@@ -266,7 +265,7 @@ class ResNet50BinaryClassification(ViTaBinaryClassification):
 
         # Network
         self.img_shape = self.hparams.val_dset[0][0].shape
-        self.num_classes = 1 # TODO: hard coded
+        self.num_classes = 1
         
         self.network = self._initial_network()
         self.selected_features = self.hparams.tabular_hparams.selected_features

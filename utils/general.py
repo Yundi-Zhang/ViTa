@@ -2,11 +2,11 @@ import argparse
 import numpy as np
 import torch
 import os
-from typing import Optional, Union
+from typing import Union
 import dataclasses
-import socket
+import shutil
 from skimage.metrics import hausdorff_distance as skhausdorff
-
+from huggingface_hub import hf_hub_download, list_repo_files
 
 
 def parser_command_line():
@@ -41,28 +41,84 @@ def parser_command_line():
 
 @dataclasses.dataclass
 class PathHolder:
-    # Image data paths
-    image_root_folder: str
-    image_processed_folder: str
-    
-    # Tabular data paths
-    all_feature_tabular_dir: str
-    biomarker_tabular_dir: str
-    
-    dataloader_image_file_folder: str # Processed file path
-    dataloader_tabular_file_folder: str # Processed file path
-    log_folder: str # Logging path
+    dataloader_image_file_folder: str 
+    dataloader_tabular_file_folder: str
+    image_subject_paths_folder: str
+    raw_tabular_data_path: str
+    input_tabular_data_path: str
+    log_folder: str
 
 
 def get_data_paths():
-    return PathHolder(image_root_folder=os.path.join(os.environ["IMAGE_DATA_ROOT"]),
-                      image_processed_folder=os.path.join(os.environ["IMAGE_PROCESS_ROOT"]),
-                      all_feature_tabular_dir=os.path.join(os.environ["ALL_FEATURE_TABULAR_DIR"]),
-                      biomarker_tabular_dir=os.path.join(os.environ["BIOMARKER_TABULAR_DIR"]),
-                      log_folder=os.path.join(os.environ["LOG_FOLDER"]),
-                      dataloader_image_file_folder=os.path.join(os.environ["DATALOADER_IMAGE_FILE_ROOT"]),
-                      dataloader_tabular_file_folder=os.path.join(os.environ["DATALOADER_TABULAR_FILE_ROOT"]),
-                      )
+    return PathHolder(
+        dataloader_image_file_folder=os.path.join(os.environ["DATALOADER_IMAGE_FILE_ROOT"]),
+        dataloader_tabular_file_folder=os.path.join(os.environ["DATALOADER_TABULAR_FILE_ROOT"]),
+        image_subject_paths_folder=os.path.join(os.environ["IMAGE_SUBJ_PATHS_FOLDER"]),
+        raw_tabular_data_path=os.path.join(os.environ["RAW_TABULAR_DATA_PATH"]),
+        input_tabular_data_path=os.path.join(os.environ["PREPROCESSED_TABULAR_DATA_PATH"]),
+        log_folder=os.path.join(os.environ["LOG_FOLDER"]),
+        )
+
+
+def download_checkpoints(repo_id="UKBB-Foundational-Models/ViTa",
+                         log_dir="./log",
+                         cache_dir="./hf_cache"):
+    """
+    Download checkpoints from a Hugging Face repo and organize them into folders.
+    Skips downloading if the checkpoint already exists in the target folder.
+    """
+    # Define target directories
+    ckpt_imaging = os.path.join(log_dir, "checkpoints_imaging")
+    ckpt_imaging_tabular = os.path.join(log_dir, "checkpoints_imaging_tabular")
+
+    os.makedirs(ckpt_imaging, exist_ok=True)
+    os.makedirs(ckpt_imaging_tabular, exist_ok=True)
+
+    # List files in repo
+    ckpt_files = [
+        "downstream_clas_vita_cad.ckpt", 
+        "downstream_clas_vita_diabetes.ckpt", 
+        "downstream_clas_vita_high_blood_pressure.ckpt",
+        "downstream_clas_vita_hypertension.ckpt",
+        "downstream_clas_vita_infarct.ckpt",
+        "downstream_clas_vita_stroke.ckpt",
+        "downstream_pred_vita_agewhenattendedassessmentcentre.ckpt",
+        "downstream_pred_vita_allindicators.ckpt",
+        "downstream_pred_vita_allphenotypes_lax.ckpt",
+        "downstream_pred_vita_allphenotypes_sax.ckpt",
+        "downstream_seg_mae_allax.ckpt",
+        "pretrain_mae_allax.ckpt",
+        "pretrain_vita.ckpt"
+        ]
+
+    # print(f"Found {len(ckpt_files)} checkpoint files in {repo_id}:")
+    # for f in ckpt_files:
+    #     print(" -", f)
+
+    saved_paths = {"imaging": [], "imaging_tabular": []}
+
+    # Download & save
+    for f in ckpt_files:
+        # Decide target path
+        if "vita" in f.lower():
+            target_path = os.path.join(ckpt_imaging_tabular, os.path.basename(f))
+            saved_paths["imaging_tabular"].append(target_path)
+        else:
+            target_path = os.path.join(ckpt_imaging, os.path.basename(f))
+            saved_paths["imaging"].append(target_path)
+
+        # Skip if already exists
+        if os.path.exists(target_path):
+            print(f"⏩ Skipping {f}, already exists at {target_path}")
+            continue
+
+        # Otherwise download and copy
+        local_path = hf_hub_download(repo_id=repo_id, filename=f, cache_dir=cache_dir)
+        print(f"⬇️  Downloading {f} → {target_path}")
+        shutil.copy(local_path, target_path)
+
+    print("✅ Done! All checkpoints are available locally.")
+    return saved_paths
 
 
 def normalize_image(im: Union[np.ndarray, torch.Tensor], low: float = None, high: float = None, clip=True, 

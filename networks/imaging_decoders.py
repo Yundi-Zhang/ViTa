@@ -258,7 +258,7 @@ class ImagingMaskedDecoder(nn.Module):
             torch.nn.init.normal_(self.mask_token, std=.02)
 
         # Initialize nn.Linear and nn.LayerNorm
-        self.apply(self._init_weights) # TODO
+        self.apply(self._init_weights)
         
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):

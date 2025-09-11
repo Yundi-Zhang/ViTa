@@ -47,7 +47,7 @@ class RegrMAE(BasicModule):
                                          use_both_axes=self.use_both_axes)
         self.dec_pos_embed.data.copy_(dec_pos_embed.unsqueeze(0))
         # Initialize nn.Linear and nn.LayerNorm
-        self.apply(self._init_weights) # TODO
+        self.apply(self._init_weights)
         
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
@@ -72,7 +72,7 @@ class RegrMAE(BasicModule):
         
         # Append mask tokens and add positional embedding in schuffled order
         dec_pos_embed = self.dec_pos_embed.repeat(x.shape[0], 1, 1)
-        x = x + dec_pos_embed # TODO: Dropput
+        x = x + dec_pos_embed
         if self.regressor_type == "linear":
             x = x[:, 1:, :] # remove cls token
         elif self.regressor_type == "cls_token":
@@ -100,7 +100,7 @@ class RegrMAE(BasicModule):
         self.module_logger.update_metric_item(f"{mode}/regr_loss", loss.detach().item(), mode=mode)
         self.module_logger.update_metric_item(f"{mode}/mae", mae, mode=mode)
         if mode == "val":
-            self.log_dict({f"{mode}_MAE": mae}) # For checkpoint tracking # TODO 
+            self.log_dict({f"{mode}_MAE": mae}) # For checkpoint tracking
         return loss
         
     @torch.no_grad()
@@ -192,7 +192,7 @@ class ResNet18Module(BasicModule):
                 else:
                     self.module_logger.update_metric_item(f"{mode}/{k}", v, mode=mode)
         if mode == "val":
-            self.log_dict({f"{mode}_MAE": losses["mean_mae"]}) # For checkpoint tracking # TODO 
+            self.log_dict({f"{mode}_MAE": losses["mean_mae"]}) # For checkpoint tracking
         return loss
         
     @torch.no_grad()

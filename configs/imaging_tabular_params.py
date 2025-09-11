@@ -7,11 +7,10 @@ from typing import Optional, Tuple
 @dataclass
 class GeneralParams:
     # wandb logging configs
-    wandb_project_name: str = "Tabular-Imaging"
+    wandb_project_name: str = "ViTa"
     wandb_group_name: Optional[str] = None
     wandb_run_name: Optional[str] = None
     wandb_run_id: Optional[str] = None
-    wandb_entity: str = "none"
     wandb_disabled: str = "true"
     
     seed: int = 1
@@ -24,17 +23,7 @@ class GeneralParams:
 @dataclass
 class ImagingDataParams:
     cmr_path_pickle_name: str = "cmr_subject_paths.pkl"
-    subj_ids_with_required_size_pickle_name: str = "subj_ids.pkl"
-    biomarker_table_pickle_name: str = "biomarker_table.pkl"
-    processed_table_pickle_name: str = "processed_table.pkl"
-    replace_processed: bool = False
     augment: bool = True
-    path_file_name: str = "data_paths.pkl"
-    selected_subject_pkl_name: str = "selected_subject.pkl"
-    target_pkl_name: str = "target_table.pkl"
-    processed_file_name: str = "processed_seg_allax.npz"
-    health_flag: int = 0 # 0: only have the healthy cases; 1: only have the unhealthy cases
-    data_filtering: bool = True
     ignore_phenotype_tabular: bool = False # Whether the images have a row in tabular data is ignored
     load_seg: bool = False
     all_value_names: Tuple[str, ...] = ("Age", "LVEDV (mL)", "LVESV (mL)", "LVSV (mL)", "LVEF (%)", "LVCO (L/min)", "LVM (g)", "RVEDV (mL)", "RVESV (mL)", "RVSV (mL)", "RVEF (%)", "LAV max (mL)", "LAV min (mL)", "LASV (mL)", "LAEF (%)", "RAV max (mL)", "RAV min (mL)", "RASV (mL)", "RAEF (%)")
@@ -73,7 +62,6 @@ class ValidationDataParams:
 @dataclass
 class GeneralDataParams:
     dataset_cls: str = "Cardiac3DplusTAllAX"
-    idx_start: int = 0
     num_train: int = 6000
     train_num_per_epoch: int = None
     num_val: int = 100
@@ -169,7 +157,7 @@ class TrainingParams:
     log_images: bool = False
     
     # Optimizer and scheduler
-    dropout: float = 0.0 # TODO
+    dropout: float = 0.0
     lr: float = 1e-4
     min_lr: float = 0.0
     

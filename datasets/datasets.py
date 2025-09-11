@@ -112,7 +112,7 @@ class Cardiac2DplusT(AbstractDataset):
         return int(self.subject_paths[index].parent.name)
     
     def get_view(self) -> int:
-        return 0 # For short-axis view #TODO: should include long-axis view
+        return 0 # For short-axis view
     
     def load_im_seg_arr(self, img_idx: int, 
                         z_2D_random: Optional[bool]=False,

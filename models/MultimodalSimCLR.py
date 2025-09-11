@@ -1,8 +1,11 @@
 import json
+import os
+from pathlib import Path
 import random
 import time
 from typing import List, Tuple, Dict
 
+import numpy as np
 from sklearn.discriminant_analysis import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.manifold import TSNE
@@ -20,10 +23,6 @@ from transformers import get_cosine_schedule_with_warmup
 from networks.tabular_encoders import *
 from utils.logging_related import imgs_to_wandb_video
 from utils.utils_visualization import plot_one_label
-
-
-with open('datasets/data_files/tabular_files/feature_names.json', 'r') as f:
-    FEATURE_NAMES_IN = json.load(f)
     
 
 class MultimodalSimCLR(pl.LightningModule):
@@ -44,7 +43,6 @@ class MultimodalSimCLR(pl.LightningModule):
         self.training_classifer = None
         # --------------------------------------------------------------------------
         # Imaging
-        
         use_both_axes = True if self.hparams.val_dset.get_view() == 2 else False # For positional embedding
         img_shape = self.hparams.val_dset[0][0].shape
         self.S_sax = self.hparams.val_dset.sax_slice_num
@@ -55,10 +53,12 @@ class MultimodalSimCLR(pl.LightningModule):
                                                       imaging_hp.projection_dim)
         # --------------------------------------------------------------------------
         # Tabular
+        with open(Path(os.environ["FEATURE_NAMES_IN"]), 'r') as f:
+            input_feature_names = json.load(f)
         self.tabular_encoder_cls = globals()[tabular_hp.tabular_encoder_type]
         self.encoder_tabular = self.tabular_encoder_cls(tabular_hp, 
                                                         patch_num=self.encoder_imaging.patch_embed.num_patches,
-                                                        all_feature_names=FEATURE_NAMES_IN)
+                                                        all_feature_names=input_feature_names)
         self.projector_tabular = SimCLRProjectionHead(tabular_hp.embedding_dim, 
                                                       tabular_hp.embedding_dim, 
                                                       tabular_hp.projection_dim)
@@ -195,6 +195,10 @@ class MultimodalSimCLR(pl.LightningModule):
                 return
             if mode == "val" and len(self.train_step_outputs) == 0: 
                 return
+            
+            if mode == "test":
+                self.log_visualization_metrics(mode=mode)
+                return
 
             # Log metrics for validation
             if self.hparams.validation_form == "classification": 
@@ -247,19 +251,31 @@ class MultimodalSimCLR(pl.LightningModule):
         return
 
     def log_visualization_metrics(self, mode="train"):
-        if mode == "val":
-            img_embeddings, tab_embeddings, labels = self.stack_outputs(self.val_step_outputs)
-            scaled_cls = StandardScaler().fit_transform(img_embeddings)
-            del embeddings
-            tsne_map_cls = TSNE(n_components=3, perplexity=5, learning_rate="auto").fit_transform(scaled_cls)
-            for i, feature_name in enumerate(self.hparams.selected_cols):
-                name = feature_name.split()[0]
-                tsne_plt = plot_one_label(map=tsne_map_cls, map_type="tsne", labels=labels[:, i], label_name=name, dim=2)
-                self.logger.experiment.log({f"TSNE_vis_{name}": wandb.Image(tsne_plt, caption=f"TSNE Visualization at training epoch {self.current_epoch}")})
-                del tsne_plt
-            del scaled_cls, tsne_map_cls
-        eval(f"self.{mode}_step_outputs.clear()")
-        return
+        img_embeddings, _, labels = getattr(self, "stack_outputs")(getattr(self, f"{mode}_step_outputs"))
+
+        # Map numerical features to indices in selected_cols
+        with open(Path(os.environ["FEATURE_NAMES_OUT"]), "r") as f:
+            numerical_features = json.load(f)["numerical"]
+        indices = [self.hparams.selected_cols.index(f) for f in numerical_features if f in self.hparams.selected_cols]
+        selected_labels = labels[:, indices].detach().cpu().numpy()
+
+        # Scale embeddings and compute 2D t-SNE
+        tsne_map = TSNE(n_components=2, perplexity=5, learning_rate="auto").fit_transform(StandardScaler().fit_transform(img_embeddings))
+        del img_embeddings
+
+        # Loop over each feature and log t-SNE visualization
+        for j, idx in enumerate(indices):
+            name = self.hparams.selected_cols[idx]
+            mask = ~np.isnan(selected_labels[:, j])
+            if not mask.any():  # skip all-NaN features
+                continue
+            tsne_plt = plot_one_label(map=tsne_map[mask], map_type="tsne", labels=selected_labels[mask, j], 
+                                    label_name=name, dim=2,)
+            self.logger.experiment.log({f"TSNE_vis_{name}": wandb.Image(tsne_plt, caption=f"{mode} epoch {self.current_epoch}")})
+            del tsne_plt
+
+        getattr(self, f"{mode}_step_outputs").clear()
+
 
     def stack_outputs(self, outputs: List[torch.Tensor]) -> torch.Tensor:
         """
