@@ -135,7 +135,7 @@ For evaluation:
 ```
 
 #### Stage II pretraining via contrastive learning of imaging and tabular representations
-Config file: `shell_scripts/evaluate_pretraining_imaging_tabular.sh`
+Config file: `configs/imaging_tabular_model/cl_pretraining_imaging_vita.yaml`
 Entries to update:
 - `data.cmr_path_pickle_name`: replace with your own subject file name
 - `data.tabular_data.tabular_data`: replace with the processed tabular data.
