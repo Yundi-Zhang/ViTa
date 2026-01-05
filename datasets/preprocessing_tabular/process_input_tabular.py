@@ -140,8 +140,16 @@ df_vec, indices = cardiac_features_to_vector_no_onehot_df(output_raw_data_df, ou
 out_df = pd.concat(df_vec , axis=1)
 out_df = out_df.reset_index(drop=True)
 out_df.to_csv(RAW_TABULAR_DATA_PATH, index=False)
-print("Processed the raw tabular data for prediction (output)!")
 
+# Save the scaler
+out_scaler = StandardScaler()
+num_idx = indices["numerical"]
+out_numerical_df = out_df.iloc[:, num_idx] 
+out_numerical_df = pd.DataFrame(out_scaler.fit_transform(out_numerical_df), columns=out_numerical_df.columns)
+with open(f'{DATALOADER_TABULAR_FILE_ROOT}/out_scaler.pkl', 'wb') as file:
+    pickle.dump(out_scaler, file)
+
+print("Processed the raw tabular data for prediction (output)!")
 
 
 df_vec, indices = cardiac_features_to_vector_no_onehot_df(input_raw_data_df, input_feature_data)

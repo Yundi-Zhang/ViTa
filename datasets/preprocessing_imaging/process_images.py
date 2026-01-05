@@ -23,10 +23,6 @@ IMAGE_SUBJ_PATH = Path(os.environ["IMAGE_SUBJ_PATH"]) # Path to pickle file stor
 SELECTED_IDS_PICKLE = Path(os.environ["SELECTED_IDS_PICKLE"]) # Path to pickle file storing selected subject IDs
 
 
-# --- Configurations --- #
-replace_processed = False
-
-
 # --- Utility Functions --- #
 def get_2D_slice_bbox_with_fixed_size(segmentation: np.ndarray, bbox_size: List[int] = [128, 128]) \
         -> np.ndarray:  # [Y1, X1, Y2, X2]
@@ -305,27 +301,30 @@ def process_image_and_save_paths(path_dir: str,
 
 
 
-
-# --- Main Execution --- #
-# Load existing pickle with train/val/test .npz paths or preprocess everything if missing/replaced
-try:
-    if replace_processed:
-        raise Error("Reprocess the image data")
+if __name__ == "__main__":
+    # --- Configurations --- #
+    replace_processed = False
     
-    with open(IMAGE_SUBJ_PATH, 'rb') as file:
-        paths = pickle.load(file)
-    imgs_n = len(paths["train"]) + len(paths["val"]) + len(paths["test"])
-    print(f"Loaded {imgs_n} images from {IMAGE_SUBJ_PATH}.")
+    # --- Main Execution --- #
+    # Load existing pickle with train/val/test .npz paths or preprocess everything if missing/replaced
+    try:
+        if replace_processed:
+            raise Error("Reprocess the image data")
+    
+        with open(IMAGE_SUBJ_PATH, 'rb') as file:
+            paths = pickle.load(file)
+        imgs_n = len(paths["train"]) + len(paths["val"]) + len(paths["test"])
+        print(f"Loaded {imgs_n} images from {IMAGE_SUBJ_PATH}.")
 
-except:
-    paths = process_image_and_save_paths(path_dir=IMAGE_SUBJ_PATH, 
-                                         subj_ids_dir=SELECTED_IDS_PICKLE, 
-                                         load_dir=IMAGE_DATA_ROOT, 
-                                         processed_dir=IMAGE_PROCESS_ROOT,
-                                         processed_file_name="processed_seg_allax.npz", 
-                                         num_train=MAX_NUM_TRAIN, 
-                                         num_val=MAX_NUM_VAL, 
-                                         num_test=MAX_NUM_TEST,
-                                         idx_start=0,
-                                         image_size=IMAGE_SIZE,
-                                         replace_processed=replace_processed)
+    except:
+        paths = process_image_and_save_paths(path_dir=IMAGE_SUBJ_PATH, 
+                                            subj_ids_dir=SELECTED_IDS_PICKLE, 
+                                            load_dir=IMAGE_DATA_ROOT, 
+                                            processed_dir=IMAGE_PROCESS_ROOT,
+                                            processed_file_name="processed_seg_allax.npz", 
+                                            num_train=MAX_NUM_TRAIN, 
+                                            num_val=MAX_NUM_VAL, 
+                                            num_test=MAX_NUM_TEST,
+                                            idx_start=0,
+                                            image_size=IMAGE_SIZE,
+                                            replace_processed=replace_processed)
